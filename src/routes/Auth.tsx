@@ -1,4 +1,12 @@
-import * as Yup from 'yup';
+import {
+  Form,
+  LoaderFunctionArgs,
+  redirect,
+  useActionData,
+  useLocation,
+  useNavigation,
+} from 'react-router-dom';
+import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -11,100 +19,91 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useFormik } from 'formik';
 import { fakeAuthProvider } from '@/backend/auth';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { useUserActions, useUserStore } from '@/store/user';
+import { useUserStore } from '@/store/user';
 
-type LocationState = {
-  from?: Location;
+const authSchema = z.object({
+  email: z.string().min(1, 'Required').email('Invalid email'),
+  password: z.string().min(1, 'Required'),
+});
+
+export const loginAction = async ({ request }: LoaderFunctionArgs) => {
+  let formPayload = await request.formData();
+
+  let data = Object.fromEntries(formPayload);
+
+  let parsed = authSchema.safeParse(data);
+
+  if (!parsed.success) {
+    return parsed.error.format();
+  }
+
+  let { email, password } = parsed.data;
+
+  let isSignedIn = await fakeAuthProvider.signin(email, password);
+
+  if (isSignedIn) {
+    useUserStore.getState().signIn(email!);
+
+    let redirectTo = formPayload.get('redirectTo') as string | null;
+    throw redirect(redirectTo || '/');
+  }
+
+  return null;
 };
 
-const Auth = () => {
-  const user = useUserStore(state => state.user);
-
-  const { signIn } = useUserActions();
-
-  const navigate = useNavigate();
-
-  const locationState = useLocation().state as LocationState;
-
-  const from = locationState && locationState.from ? locationState.from.pathname : '/';
-
-  const loginHandler = (values: { email: string; password: string }) => {
-    fakeAuthProvider
-      .signin(values.email, values.password)
-      .then(() => {
-        signIn(values.email);
-        navigate(from, { replace: true });
-      })
-      .catch(error => console.error(error));
-  };
-
-  const {
-    values: { email, password },
-    errors,
-    touched,
-    setFieldValue,
-    handleSubmit,
-  } = useFormik<{ email: string; password: string }>({
-    initialValues: { email: '', password: '' },
-    validationSchema: Yup.object().shape({
-      email: Yup.string().email('Invalid email').required('Required'),
-      password: Yup.string().required('Required'),
-    }),
-    onSubmit: values => loginHandler(values),
-  });
+export const loginLoader = async () => {
+  let user = useUserStore.getState().user;
 
   if (user) {
-    return <Navigate to={'/'} />;
+    throw redirect('/');
   }
+
+  return null;
+};
+
+export const Auth = () => {
+  let location = useLocation();
+  let params = new URLSearchParams(location.search);
+  let from = params.get('from') || '/';
+
+  let navigation = useNavigation();
+  let isLoggingIn = navigation.formData?.get('email') != null;
+
+  let actionData = useActionData() as Awaited<ReturnType<typeof loginAction>>;
 
   return (
     <div className='flex min-h-screen w-full flex-col items-center justify-center'>
-      <Card className='w-full max-w-sm'>
-        <CardHeader>
-          <CardTitle className='text-2xl'>Login</CardTitle>
-          <CardDescription>Enter your email below to login to your account.</CardDescription>
-        </CardHeader>
-        <CardContent className='grid gap-4'>
-          <div className='grid gap-2'>
-            <Label htmlFor='email'>Email</Label>
-            <Input
-              id='email'
-              type='email'
-              name='email'
-              required
-              value={email}
-              onChange={event => setFieldValue('email', event.target.value)}
-            />
-            {errors.email && touched.email && (
-              <p className='text-red-500 text-sm'>{errors.email}</p>
-            )}
-          </div>
-          <div className='grid gap-2'>
-            <Label htmlFor='password'>Password</Label>
-            <Input
-              id='password'
-              type='password'
-              name='password'
-              required
-              value={password}
-              onChange={event => setFieldValue('password', event.target.value)}
-            />
-            {errors.password && touched.password && (
-              <p className='text-red-500 text-sm'>{errors.password}</p>
-            )}
-          </div>
-        </CardContent>
-        <CardFooter>
-          <Button className='w-full' type='button' onClick={() => handleSubmit()}>
-            Sign in
-          </Button>
-        </CardFooter>
-      </Card>
+      <Form method='POST' replace>
+        <Card className='w-full max-w-sm'>
+          <CardHeader>
+            <CardTitle className='text-2xl'>Login</CardTitle>
+            <CardDescription>Enter your email below to login to your account.</CardDescription>
+          </CardHeader>
+          <CardContent className='grid gap-4'>
+            <div className='grid gap-2'>
+              <Input type='hidden' name='redirectTo' value={from} />
+              <Label htmlFor='email'>Email</Label>
+              <Input id='email' name='email' />
+              {actionData && actionData.email && (
+                <p className='text-red-500 text-sm'>{actionData.email._errors[0]}</p>
+              )}
+            </div>
+            <div className='grid gap-2'>
+              <Label htmlFor='password'>Password</Label>
+              <Input id='password' type='password' name='password' />
+              {actionData && actionData.password && (
+                <p className='text-red-500 text-sm'>{actionData.password._errors[0]}</p>
+              )}
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button className='w-full' type='submit' disabled={isLoggingIn}>
+              Sign in
+            </Button>
+          </CardFooter>
+        </Card>
+      </Form>
     </div>
   );
 };
-
-export default Auth;

@@ -3,8 +3,14 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 
-import App from './App.tsx';
 import './index.css';
+import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
+import { Auth, loginAction, loginLoader } from './routes/Auth.tsx';
+import { Root, rootAction, rootLoader } from './routes/Root.tsx';
+import { Note, noteAction, noteLoader } from './routes/Note.tsx';
+import { NewNote, newNoteAction, newNoteLoader } from './routes/NewNote.tsx';
+import { RootErrorBoundary } from './routes/error/RootErrorBoundary.tsx';
+import ErrorBoundary from './routes/error/ErrorBoundary.tsx';
 
 async function enableMocking() {
   if (import.meta.env.VITE_NODE_ENV !== 'development') {
@@ -27,10 +33,64 @@ const queryClient = new QueryClient({
 });
 
 enableMocking().then(() => {
+  const router = createBrowserRouter(
+    [
+      {
+        path: '/auth',
+        loader: loginLoader,
+        action: loginAction,
+        element: <Auth />,
+      },
+      {
+        path: '/',
+        loader: rootLoader,
+        action: rootAction,
+        // shouldRevalidate: ({ currentUrl, actionResult }: ShouldRevalidateFunctionArgs) => {
+        //   if (currentUrl.pathname === '/new-note' && actionResult) {
+        //     return false;
+        //   }
+
+        //   return true;
+        // },
+        element: <Root />,
+        errorElement: <RootErrorBoundary />,
+        children: [
+          {
+            path: '/note/:noteId',
+            loader: noteLoader,
+            action: noteAction,
+            element: <Note />,
+            errorElement: <ErrorBoundary />,
+          },
+          {
+            path: '/new-note',
+            element: <NewNote />,
+            loader: newNoteLoader,
+            action: newNoteAction,
+            errorElement: <ErrorBoundary />,
+          },
+        ],
+      },
+      {
+        path: '*',
+        element: <Navigate to='/' />,
+      },
+    ],
+    {
+      future: {
+        v7_normalizeFormMethod: true,
+        v7_fetcherPersist: true,
+        v7_relativeSplatPath: true,
+        v7_partialHydration: true,
+        unstable_skipActionErrorRevalidation: true,
+      },
+    },
+  );
+
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
-        <App />
+        <RouterProvider router={router} future={{ v7_startTransition: true }} />
 
         <div style={{ fontSize: '16px' }}>
           <ReactQueryDevtools initialIsOpen={false} buttonPosition='bottom-left' />

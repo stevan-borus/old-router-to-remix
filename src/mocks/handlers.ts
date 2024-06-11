@@ -1,18 +1,21 @@
 import { createNote, deleteNote, getNote, getNotes } from '@/backend/notes';
-import { Note } from '@/model/note';
+import { NoteType } from '@/model/note';
 import { delay, http, HttpResponse } from 'msw';
 
 export const handlers = [
-  http.get<{ user: string }, null, Note[], '/notes/:user'>('/notes/:user', async ({ params }) => {
-    const { user } = params;
+  http.get<{ user: string }, null, NoteType[], '/notes/:user'>(
+    '/notes/:user',
+    async ({ params }) => {
+      const { user } = params;
 
-    await delay();
+      await delay();
 
-    const notes = await getNotes(user);
+      const notes = await getNotes(user);
 
-    return HttpResponse.json(notes);
-  }),
-  http.get<{ user: string; id: string }, { user: string }, Note, '/note/:user/:id'>(
+      return HttpResponse.json(notes);
+    },
+  ),
+  http.get<{ user: string; id: string }, { user: string }, NoteType, '/note/:user/:id'>(
     '/note/:user/:id',
     async ({ params }) => {
       const { user, id } = params;
@@ -28,7 +31,7 @@ export const handlers = [
       return HttpResponse.json(note);
     },
   ),
-  http.post<never, { user: string; title: string; message: string }, Note>(
+  http.post<never, { user: string; title: string; message: string }, NoteType>(
     '/note',
     async ({ request }) => {
       const data = await request.json();

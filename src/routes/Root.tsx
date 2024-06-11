@@ -1,37 +1,58 @@
-import { Link, Outlet, useNavigate } from 'react-router-dom';
-import { useUserActions, useUserStore } from '../store/user';
+import {
+  Form,
+  Link,
+  LoaderFunctionArgs,
+  NavLink,
+  Outlet,
+  redirect,
+  useLoaderData,
+} from 'react-router-dom';
+import { useUserStore } from '../store/user';
 import { Button } from '@/components/ui/button';
-import { useQuery } from '@tanstack/react-query';
-import { noteQueries } from '@/queries/note/noteQueriesFactory';
+import { notesSchema } from '@/model/note';
 
-const Root = () => {
-  const user = useUserStore(state => state.user);
+export const rootAction = async () => {
+  useUserStore.getState().signOut();
 
-  const { data: notes, isLoading, isError } = useQuery(noteQueries.list(user!));
+  throw redirect('/auth');
+};
 
-  const { signOut } = useUserActions();
+export const rootLoader = async ({ request }: LoaderFunctionArgs) => {
+  let user = useUserStore.getState().user;
 
-  const navigate = useNavigate();
+  if (!user) {
+    let params = new URLSearchParams();
+    params.set('from', new URL(request.url).pathname);
+    throw redirect('/auth?' + params.toString());
+  }
 
-  const logoutHandler = () => {
-    signOut();
+  try {
+    let response = await fetch(`/notes/${user}`);
 
-    navigate('/auth');
-  };
+    let notes = await response.json();
 
-  const notesContent = (() => {
-    if (isLoading) {
-      return <h2>Loading...</h2>;
-    }
+    return notesSchema.safeParse(notes);
+  } catch (error) {
+    throw new Error(`Error fetching notes - ${error}`);
+  }
+};
 
-    if (isError) {
+export const Root = () => {
+  let data = useLoaderData() as Awaited<ReturnType<typeof rootLoader>>;
+
+  let notesContent = (() => {
+    if (!data.success) {
       return <h2>Notes error</h2>;
     }
 
-    return notes?.map(note => (
-      <li key={note.id}>
-        <Link to={`/note/${note.id}`}>{note.title}</Link>
-      </li>
+    return data.data.map(note => (
+      <NavLink key={note.id} to={`/note/${note.id}`}>
+        {({ isActive, isPending }) => (
+          <li className={`${isActive ? 'text-blue-500' : ''} ${isPending && 'text-gray-500'}`}>
+            {note.title}
+          </li>
+        )}
+      </NavLink>
     ));
   })();
 
@@ -41,9 +62,9 @@ const Root = () => {
         <div className='mx-auto w-full max-w-6xl gap-2 flex justify-between'>
           <h1 className='text-3xl font-semibold'>Notes</h1>
 
-          <Button type='button' onClick={logoutHandler}>
-            Logout
-          </Button>
+          <Form method='POST' replace>
+            <Button type='submit'>Logout</Button>
+          </Form>
         </div>
         <div className='mx-auto grid w-full max-w-6xl items-start gap-6 md:grid-cols-[180px_1fr] lg:grid-cols-[250px_1fr]'>
           <nav className='grid gap-4 text-sm text-muted-foreground' x-chunk='dashboard-04-chunk-0'>
@@ -64,5 +85,3 @@ const Root = () => {
     </div>
   );
 };
-
-export default Root;

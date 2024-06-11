@@ -1,4 +1,4 @@
-import { Note } from '@/model/note';
+import { NoteType } from '@/model/note';
 import { queryOptions } from '@tanstack/react-query';
 
 export const noteQueries = {
@@ -7,18 +7,18 @@ export const noteQueries = {
     queryOptions({
       queryKey: [...noteQueries.all, 'list', user],
       queryFn: async () => {
-        const response = await fetch(`/notes/${user}`);
+        let response = await fetch(`/notes/${user}`);
 
-        return (await response.json()) as Note[];
+        return (await response.json()) as NoteType[];
       },
     }),
   note: (user: string, noteId?: string) =>
     queryOptions({
       queryKey: [...noteQueries.all, 'note', user, noteId],
       queryFn: async () => {
-        const response = await fetch(`/note/${user}/${noteId}`);
+        let response = await fetch(`/note/${user}/${noteId}`);
 
-        return (await response.json()) as Note;
+        return (await response.json()) as NoteType;
       },
       enabled: Boolean(noteId),
     }),

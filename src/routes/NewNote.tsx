@@ -1,6 +1,4 @@
-import { useNavigate } from 'react-router-dom';
-import { useFormik } from 'formik';
-import * as Yup from 'yup';
+import { ActionFunctionArgs, Form, redirect, useActionData, useLoaderData } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,85 +6,85 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useUserStore } from '@/store/user';
-import useAddNote from '@/queries/note/useAddNote';
+import { z } from 'zod';
+import { noteSchema } from '@/model/note';
+import invariant from 'tiny-invariant';
 
-const NewNote = () => {
-  const user = useUserStore(state => state.user);
+const newNoteSchema = z.object({
+  title: z.string().min(1, 'Required'),
+  message: z.string().min(1, 'Required'),
+  user: z.string(),
+});
 
-  const navigate = useNavigate();
+export const newNoteAction = async ({ request }: ActionFunctionArgs) => {
+  let formData = await request.formData();
 
-  const { mutate: addNote } = useAddNote();
+  let data = Object.fromEntries(formData);
 
-  const addNoteHandler = async (values: { title: string; message: string }) => {
-    if (user) {
-      addNote(
-        { user, ...values },
-        {
-          onSuccess: data => navigate(`/note/${data.id}`),
-          onError: error => console.log(error),
-        },
-      );
-    }
-  };
+  let parsed = newNoteSchema.safeParse(data);
 
-  const {
-    values: { title, message },
-    errors,
-    touched,
-    setFieldValue,
-    handleSubmit,
-  } = useFormik<{ title: string; message: string }>({
-    initialValues: { title: '', message: '' },
-    validationSchema: Yup.object().shape({
-      title: Yup.string().required('Required'),
-      message: Yup.string().required('Required'),
-    }),
-    onSubmit: values => addNoteHandler(values),
+  if (!parsed.success) {
+    return parsed.error.format();
+  }
+
+  let { user, title, message } = parsed.data;
+
+  let response = await fetch(`/note`, {
+    method: 'POST',
+    body: JSON.stringify({ user, title, message }),
   });
+
+  let note = await response.json();
+
+  let noteParsed = noteSchema.parse(note);
+
+  throw redirect(`/note/${noteParsed.id}`);
+};
+
+export const newNoteLoader = async () => {
+  let user = useUserStore.getState().user;
+
+  invariant(user, 'User not found');
+
+  return user;
+};
+
+export const NewNote = () => {
+  let user = useLoaderData() as Awaited<ReturnType<typeof newNoteLoader>>;
+
+  let actionData = useActionData() as Awaited<ReturnType<typeof newNoteAction>>;
 
   return (
     <Card className='w-full' x-chunk='dashboard-07-chunk-0'>
-      <CardHeader>
-        <CardTitle>Add note</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className='grid gap-6'>
-          <div className='grid gap-3'>
-            <Label htmlFor='title'>Title</Label>
-            <Input
-              id='title'
-              type='text'
-              name='title'
-              className='w-full'
-              value={title}
-              onChange={event => setFieldValue('title', event.target.value)}
-            />
-            {errors.title && touched.title && (
-              <p className='text-red-500 text-sm'>{errors.title}</p>
-            )}
+      <Form method='POST'>
+        <CardHeader>
+          <CardTitle>Add note</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Input type='hidden' name='user' value={user} />
+          <div className='grid gap-6'>
+            <div className='grid gap-3'>
+              <Label htmlFor='title'>Title</Label>
+              <Input id='title' name='title' type='text' className='w-full' />
+              {actionData && actionData.title && (
+                <p className='text-red-500 text-sm'>{actionData.title._errors[0]}</p>
+              )}
+            </div>
+            <div className='grid gap-3'>
+              <Label htmlFor='message'>Message</Label>
+              <Textarea id='message' name='message' className='min-h-32' />
+              {actionData && actionData.message && (
+                <p className='text-red-500 text-sm'>{actionData.message._errors[0]}</p>
+              )}
+            </div>
           </div>
-          <div className='grid gap-3'>
-            <Label htmlFor='message'>Message</Label>
-            <Textarea
-              id='message'
-              name='message'
-              value={message}
-              className='min-h-32'
-              onChange={event => setFieldValue('message', event.target.value)}
-            />
-            {errors.message && touched.message && (
-              <p className='text-red-500 text-sm'>{errors.message}</p>
-            )}
-          </div>
-        </div>
-      </CardContent>
-      <CardFooter>
-        <Button className='w-full' type='button' onClick={() => handleSubmit()}>
-          Add
-        </Button>
-      </CardFooter>
+        </CardContent>
+        <CardFooter>
+          <Button className='w-full' type='submit'>
+            Add
+          </Button>
+        </CardFooter>
+      </Form>
     </Card>
   );
 };
-
-export default NewNote;

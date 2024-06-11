@@ -1,8 +1,8 @@
 import localforage from 'localforage';
-import { Note } from '../model/note';
+import { NoteType } from '../model/note';
 
 export async function getNotes(user: string) {
-  let notes = await localforage.getItem<Note[]>('notes');
+  let notes = await localforage.getItem<NoteType[]>('notes');
   if (!notes) notes = [];
   return notes.filter(note => note.user === user);
 }
@@ -25,7 +25,7 @@ export async function createNote({
 }
 
 export async function getNote(user: string, id: string) {
-  const notes = await localforage.getItem<Note[]>('notes');
+  const notes = await localforage.getItem<NoteType[]>('notes');
 
   if (notes) {
     const note = notes.find(note => note.id === id && note.user === user);
@@ -36,7 +36,7 @@ export async function getNote(user: string, id: string) {
 }
 
 export async function deleteNote(user: string, id: string) {
-  const notes = await localforage.getItem<Note[]>('notes');
+  const notes = await localforage.getItem<NoteType[]>('notes');
 
   if (notes) {
     const index = notes.findIndex(note => note.id === id && note.user === user);
@@ -53,6 +53,6 @@ export async function deleteNote(user: string, id: string) {
   return false;
 }
 
-function set(notes: Note[]) {
+function set(notes: NoteType[]) {
   return localforage.setItem('notes', notes);
 }

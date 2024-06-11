@@ -1,71 +1,85 @@
-import { useNavigate, useParams } from 'react-router-dom';
+import {
+  ActionFunctionArgs,
+  Form,
+  LoaderFunctionArgs,
+  redirect,
+  useLoaderData,
+  useNavigation,
+} from 'react-router-dom';
+import invariant from 'tiny-invariant';
 import { Trash } from 'lucide-react';
 import { useUserStore } from '../store/user';
-import type { Note } from '../model/note';
+import { noteSchema } from '../model/note';
 import { Button } from '@/components/ui/button';
 import NotFound from '@/components/NotFound';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useQuery } from '@tanstack/react-query';
-import { noteQueries } from '@/queries/note/noteQueriesFactory';
-import useDeleteNote from '@/queries/note/useDeleteNote';
+import { Input } from '@/components/ui/input';
 
-const Note = () => {
-  const user = useUserStore(state => state.user);
+export const noteAction = async ({ request, params }: ActionFunctionArgs) => {
+  let formData = await request.formData();
 
-  const { noteId } = useParams();
+  let user = formData.get('user') as string | null;
 
-  const { data: note, isLoading, isError } = useQuery(noteQueries.note(user!, noteId));
+  invariant(user, 'User not found');
+  invariant(params.noteId, 'Note id not found');
 
-  const navigate = useNavigate();
+  await fetch(`/note/${user}/${params.noteId}`, {
+    method: 'DELETE',
+  });
 
-  const { mutate: deleteNote } = useDeleteNote();
+  throw redirect('/new-note');
+};
 
-  const deleteNoteHandler = () => {
-    if (user && noteId) {
-      deleteNote(
-        { user, noteId },
-        {
-          onSuccess: () => navigate('/new-note'),
-          onError: error => console.log(error),
-        },
-      );
-    }
-  };
+export const noteLoader = async ({ params }: LoaderFunctionArgs) => {
+  let user = useUserStore.getState().user;
 
-  if (isLoading) {
-    return <h2>Loading note...</h2>;
+  invariant(user, 'User not found');
+  invariant(params.noteId, 'Note id not found');
+
+  try {
+    let response = await fetch(`/note/${user}/${params.noteId}`);
+
+    let note = await response.json();
+
+    let noteParsed = noteSchema.parse(note);
+
+    return { user, note: noteParsed };
+  } catch (error) {
+    throw new Error(`Error fetching notes - ${error}`);
   }
+};
 
-  if (isError) {
-    return <h2>Note error</h2>;
-  }
+export const Note = () => {
+  let { user, note } = useLoaderData() as Awaited<ReturnType<typeof noteLoader>>;
+
+  let navigation = useNavigation();
+
+  let isLoading = navigation.state === 'loading';
 
   if (!note) {
     return <NotFound resource='note' />;
   }
 
   return (
-    <Card className='w-full overflow-hidden' x-chunk='dashboard-05-chunk-4'>
+    <Card
+      className={`w-full overflow-hidden ${isLoading && 'opacity-30'}`}
+      x-chunk='dashboard-05-chunk-4'
+    >
       <CardHeader className='flex flex-row items-start bg-muted/50'>
         <div className='grid gap-0.5'>
           <CardTitle className='group flex items-center gap-2 text-lg'>{note?.title}</CardTitle>
           <CardDescription>{note?.message}</CardDescription>
         </div>
         <div className='ml-auto flex items-center gap-1'>
-          <Button
-            type='button'
-            size='icon'
-            variant='outline'
-            className='h-8 w-8'
-            onClick={deleteNoteHandler}
-          >
-            <Trash className='h-3.5 w-3.5' />
-            <span className='sr-only'>Delete</span>
-          </Button>
+          <Form method='POST'>
+            <Input type='hidden' name='user' value={user} />
+            <Button type='submit' size='icon' variant='outline' className='h-8 w-8'>
+              <Trash className='h-3.5 w-3.5' />
+              <span className='sr-only'>Delete</span>
+            </Button>
+          </Form>
         </div>
       </CardHeader>
     </Card>
   );
 };
-
-export default Note;
