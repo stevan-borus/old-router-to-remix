@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Trash } from 'lucide-react';
 import { useUserStore } from '../store/user';
@@ -6,52 +5,39 @@ import type { Note } from '../model/note';
 import { Button } from '@/components/ui/button';
 import NotFound from '@/components/NotFound';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useQuery } from '@tanstack/react-query';
+import { noteQueries } from '@/queries/note/noteQueriesFactory';
+import useDeleteNote from '@/queries/note/useDeleteNote';
 
 const Note = () => {
-  const [note, setNote] = useState<Note | null>(null);
-  const [loading, setLoading] = useState(true);
-
   const user = useUserStore(state => state.user);
 
   const { noteId } = useParams();
 
+  const { data: note, isLoading, isError } = useQuery(noteQueries.note(user!, noteId));
+
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchNote = async () => {
-      try {
-        const response = await fetch(`/note/${user}/${noteId}`);
+  const { mutate: deleteNote } = useDeleteNote();
 
-        const note = await response.json();
-
-        setNote(note);
-        setLoading(false);
-      } catch (error) {
-        console.log(error);
-      }
-    };
-
-    if (noteId) {
-      fetchNote();
-    }
-  }, [user, noteId]);
-
-  const deleteNoteHandler = async () => {
+  const deleteNoteHandler = () => {
     if (user && noteId) {
-      try {
-        await fetch(`/note/${user}/${noteId}`, {
-          method: 'DELETE',
-        });
-
-        navigate('/new-note');
-      } catch (error) {
-        console.log(error);
-      }
+      deleteNote(
+        { user, noteId },
+        {
+          onSuccess: () => navigate('/new-note'),
+          onError: error => console.log(error),
+        },
+      );
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return <h2>Loading note...</h2>;
+  }
+
+  if (isError) {
+    return <h2>Note error</h2>;
   }
 
   if (!note) {

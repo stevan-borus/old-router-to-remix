@@ -1,41 +1,39 @@
-import { useEffect, useState } from 'react';
 import { Link, Outlet, useNavigate } from 'react-router-dom';
-import type { Note } from '../model/note';
 import { useUserActions, useUserStore } from '../store/user';
 import { Button } from '@/components/ui/button';
+import { useQuery } from '@tanstack/react-query';
+import { noteQueries } from '@/queries/note/noteQueriesFactory';
 
 const Root = () => {
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [loading, setLoading] = useState(true);
-
   const user = useUserStore(state => state.user);
+
+  const { data: notes, isLoading, isError } = useQuery(noteQueries.list(user!));
 
   const { signOut } = useUserActions();
 
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const fetchNotes = async () => {
-      try {
-        const response = await fetch(`/notes/${user}`);
-
-        const notes = await response.json();
-
-        setNotes(notes);
-        setLoading(false);
-      } catch (error) {
-        console.log(error);
-      }
-    };
-
-    fetchNotes();
-  }, [user]);
 
   const logoutHandler = () => {
     signOut();
 
     navigate('/auth');
   };
+
+  const notesContent = (() => {
+    if (isLoading) {
+      return <h2>Loading...</h2>;
+    }
+
+    if (isError) {
+      return <h2>Notes error</h2>;
+    }
+
+    return notes?.map(note => (
+      <li key={note.id}>
+        <Link to={`/note/${note.id}`}>{note.title}</Link>
+      </li>
+    ));
+  })();
 
   return (
     <div className='flex min-h-screen w-full flex-col'>
@@ -53,15 +51,7 @@ const Root = () => {
               <Link to='new-note'>Create Note</Link>
             </Button>
 
-            {loading ? (
-              <h2>Loading...</h2>
-            ) : (
-              notes.map(note => (
-                <li key={note.id}>
-                  <Link to={`/note/${note.id}`}>{note.title}</Link>
-                </li>
-              ))
-            )}
+            {notesContent}
           </nav>
 
           <div className='flex flex-1 items-center justify-center' x-chunk='dashboard-02-chunk-1'>

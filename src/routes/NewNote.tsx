@@ -8,35 +8,24 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useUserStore } from '@/store/user';
-import { useEffect } from 'react';
+import useAddNote from '@/queries/note/useAddNote';
 
 const NewNote = () => {
   const user = useUserStore(state => state.user);
 
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const response = await fetch('https://official-joke-api.appspot.com/random_joke');
-      const data = await response.json();
-      console.log(data);
-    };
-
-    fetchData();
-  }, []);
+  const { mutate: addNote } = useAddNote();
 
   const addNoteHandler = async (values: { title: string; message: string }) => {
-    try {
-      const response = await fetch(`/note`, {
-        method: 'POST',
-        body: JSON.stringify({ user, ...values }),
-      });
-
-      const note = await response.json();
-
-      navigate(`/note/${note.id}`);
-    } catch (error) {
-      console.log(error);
+    if (user) {
+      addNote(
+        { user, ...values },
+        {
+          onSuccess: data => navigate(`/note/${data.id}`),
+          onError: error => console.log(error),
+        },
+      );
     }
   };
 
