@@ -9,48 +9,54 @@ import {
 import invariant from 'tiny-invariant';
 import { Trash } from 'lucide-react';
 import { useUserStore } from '../store/user';
-import { noteSchema } from '../model/note';
 import { Button } from '@/components/ui/button';
 import NotFound from '@/components/NotFound';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { QueryClient, useSuspenseQuery } from '@tanstack/react-query';
+import { noteQueries } from '@/queries/note/noteQueriesFactory';
 
-export const noteAction = async ({ request, params }: ActionFunctionArgs) => {
-  let formData = await request.formData();
+export const noteAction =
+  (queryClient: QueryClient) =>
+  async ({ request, params }: ActionFunctionArgs) => {
+    let formData = await request.formData();
 
-  let user = formData.get('user') as string | null;
+    let user = formData.get('user') as string | null;
 
-  invariant(user, 'User not found');
-  invariant(params.noteId, 'Note id not found');
+    invariant(user, 'User not found');
+    invariant(params.noteId, 'Note id not found');
 
-  await fetch(`/note/${user}/${params.noteId}`, {
-    method: 'DELETE',
-  });
+    await fetch(`/note/${user}/${params.noteId}`, {
+      method: 'DELETE',
+    });
 
-  throw redirect('/new-note');
-};
+    queryClient.removeQueries({ queryKey: noteQueries.note(user, params.noteId).queryKey });
+    await queryClient.invalidateQueries({ queryKey: noteQueries.list(user).queryKey });
 
-export const noteLoader = async ({ params }: LoaderFunctionArgs) => {
-  let user = useUserStore.getState().user;
+    throw redirect('/new-note');
+  };
 
-  invariant(user, 'User not found');
-  invariant(params.noteId, 'Note id not found');
+export const noteLoader =
+  (queryClient: QueryClient) =>
+  async ({ params }: LoaderFunctionArgs) => {
+    let user = useUserStore.getState().user;
 
-  try {
-    let response = await fetch(`/note/${user}/${params.noteId}`);
+    invariant(user, 'User not found');
+    invariant(params.noteId, 'Note id not found');
 
-    let note = await response.json();
+    try {
+      await queryClient.ensureQueryData(noteQueries.note(user, params.noteId));
 
-    let noteParsed = noteSchema.parse(note);
-
-    return { user, note: noteParsed };
-  } catch (error) {
-    throw new Error(`Error fetching notes - ${error}`);
-  }
-};
+      return { user, noteId: params.noteId };
+    } catch (error) {
+      throw new Error(`Error fetching notes - ${error}`);
+    }
+  };
 
 export const Note = () => {
-  let { user, note } = useLoaderData() as Awaited<ReturnType<typeof noteLoader>>;
+  let { user, noteId } = useLoaderData() as Awaited<ReturnType<ReturnType<typeof noteLoader>>>;
+
+  const { data: note } = useSuspenseQuery(noteQueries.note(user, noteId));
 
   let navigation = useNavigation();
 

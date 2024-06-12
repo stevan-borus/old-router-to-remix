@@ -43,22 +43,15 @@ enableMocking().then(() => {
       },
       {
         path: '/',
-        loader: rootLoader,
+        loader: rootLoader(queryClient),
         action: rootAction,
-        // shouldRevalidate: ({ currentUrl, actionResult }: ShouldRevalidateFunctionArgs) => {
-        //   if (currentUrl.pathname === '/new-note' && actionResult) {
-        //     return false;
-        //   }
-
-        //   return true;
-        // },
         element: <Root />,
         errorElement: <RootErrorBoundary />,
         children: [
           {
             path: '/note/:noteId',
-            loader: noteLoader,
-            action: noteAction,
+            loader: noteLoader(queryClient),
+            action: noteAction(queryClient),
             element: <Note />,
             errorElement: <ErrorBoundary />,
           },
@@ -66,7 +59,7 @@ enableMocking().then(() => {
             path: '/new-note',
             element: <NewNote />,
             loader: newNoteLoader,
-            action: newNoteAction,
+            action: newNoteAction(queryClient),
             errorElement: <ErrorBoundary />,
           },
         ],

@@ -7,9 +7,11 @@ import {
   redirect,
   useLoaderData,
 } from 'react-router-dom';
+import { QueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { useUserStore } from '../store/user';
 import { Button } from '@/components/ui/button';
-import { notesSchema } from '@/model/note';
+import { noteQueries } from '@/queries/note/noteQueriesFactory';
+import { NoteType } from '@/model/note';
 
 export const rootAction = async () => {
   useUserStore.getState().signOut();
@@ -17,44 +19,30 @@ export const rootAction = async () => {
   throw redirect('/auth');
 };
 
-export const rootLoader = async ({ request }: LoaderFunctionArgs) => {
-  let user = useUserStore.getState().user;
+export const rootLoader =
+  (queryClient: QueryClient) =>
+  async ({ request }: LoaderFunctionArgs) => {
+    let user = useUserStore.getState().user;
 
-  if (!user) {
-    let params = new URLSearchParams();
-    params.set('from', new URL(request.url).pathname);
-    throw redirect('/auth?' + params.toString());
-  }
-
-  try {
-    let response = await fetch(`/notes/${user}`);
-
-    let notes = await response.json();
-
-    return notesSchema.safeParse(notes);
-  } catch (error) {
-    throw new Error(`Error fetching notes - ${error}`);
-  }
-};
-
-export const Root = () => {
-  let data = useLoaderData() as Awaited<ReturnType<typeof rootLoader>>;
-
-  let notesContent = (() => {
-    if (!data.success) {
-      return <h2>Notes error</h2>;
+    if (!user) {
+      let params = new URLSearchParams();
+      params.set('from', new URL(request.url).pathname);
+      throw redirect('/auth?' + params.toString());
     }
 
-    return data.data.map(note => (
-      <NavLink key={note.id} to={`/note/${note.id}`}>
-        {({ isActive, isPending }) => (
-          <li className={`${isActive ? 'text-blue-500' : ''} ${isPending && 'text-gray-500'}`}>
-            {note.title}
-          </li>
-        )}
-      </NavLink>
-    ));
-  })();
+    try {
+      await queryClient.ensureQueryData(noteQueries.list(user));
+
+      return user;
+    } catch (error) {
+      throw new Error(`Error fetching notes - ${error}`);
+    }
+  };
+
+export const Root = () => {
+  let user = useLoaderData() as Awaited<ReturnType<ReturnType<typeof rootLoader>>>;
+
+  const { data: notes } = useSuspenseQuery(noteQueries.list(user));
 
   return (
     <div className='flex min-h-screen w-full flex-col'>
@@ -62,7 +50,7 @@ export const Root = () => {
         <div className='mx-auto w-full max-w-6xl gap-2 flex justify-between'>
           <h1 className='text-3xl font-semibold'>Notes</h1>
 
-          <Form method='POST' replace>
+          <Form method='post' replace>
             <Button type='submit'>Logout</Button>
           </Form>
         </div>
@@ -72,7 +60,17 @@ export const Root = () => {
               <Link to='new-note'>Create Note</Link>
             </Button>
 
-            {notesContent}
+            {notes.map((note: NoteType) => (
+              <NavLink key={note.id} to={`/note/${note.id}`}>
+                {({ isActive, isPending }) => (
+                  <li
+                    className={`${isActive ? 'text-blue-500' : ''} ${isPending && 'text-gray-500'}`}
+                  >
+                    {note.title}
+                  </li>
+                )}
+              </NavLink>
+            ))}
           </nav>
 
           <div className='flex flex-1 items-center justify-center' x-chunk='dashboard-02-chunk-1'>

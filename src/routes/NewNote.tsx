@@ -1,4 +1,7 @@
 import { ActionFunctionArgs, Form, redirect, useActionData, useLoaderData } from 'react-router-dom';
+import { z } from 'zod';
+import invariant from 'tiny-invariant';
+import { QueryClient } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,9 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useUserStore } from '@/store/user';
-import { z } from 'zod';
 import { noteSchema } from '@/model/note';
-import invariant from 'tiny-invariant';
+import { noteQueries } from '@/queries/note/noteQueriesFactory';
 
 const newNoteSchema = z.object({
   title: z.string().min(1, 'Required'),
@@ -16,30 +18,34 @@ const newNoteSchema = z.object({
   user: z.string(),
 });
 
-export const newNoteAction = async ({ request }: ActionFunctionArgs) => {
-  let formData = await request.formData();
+export const newNoteAction =
+  (queryClient: QueryClient) =>
+  async ({ request }: ActionFunctionArgs) => {
+    let formData = await request.formData();
 
-  let data = Object.fromEntries(formData);
+    let data = Object.fromEntries(formData);
 
-  let parsed = newNoteSchema.safeParse(data);
+    let parsed = newNoteSchema.safeParse(data);
 
-  if (!parsed.success) {
-    return parsed.error.format();
-  }
+    if (!parsed.success) {
+      return parsed.error.format();
+    }
 
-  let { user, title, message } = parsed.data;
+    let { user, title, message } = parsed.data;
 
-  let response = await fetch(`/note`, {
-    method: 'POST',
-    body: JSON.stringify({ user, title, message }),
-  });
+    let response = await fetch(`/note`, {
+      method: 'POST',
+      body: JSON.stringify({ user, title, message }),
+    });
 
-  let note = await response.json();
+    await queryClient.invalidateQueries({ queryKey: noteQueries.list(user).queryKey });
 
-  let noteParsed = noteSchema.parse(note);
+    let note = await response.json();
 
-  throw redirect(`/note/${noteParsed.id}`);
-};
+    let noteParsed = noteSchema.parse(note);
+
+    throw redirect(`/note/${noteParsed.id}`);
+  };
 
 export const newNoteLoader = async () => {
   let user = useUserStore.getState().user;
@@ -52,7 +58,7 @@ export const newNoteLoader = async () => {
 export const NewNote = () => {
   let user = useLoaderData() as Awaited<ReturnType<typeof newNoteLoader>>;
 
-  let actionData = useActionData() as Awaited<ReturnType<typeof newNoteAction>>;
+  let actionData = useActionData() as Awaited<ReturnType<ReturnType<typeof newNoteAction>>>;
 
   return (
     <Card className='w-full' x-chunk='dashboard-07-chunk-0'>
