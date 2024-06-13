@@ -1,7 +1,14 @@
-import { ActionFunctionArgs, Form, redirect, useActionData, useLoaderData } from 'react-router-dom';
+import {
+  Form,
+  isRouteErrorResponse,
+  redirect,
+  useActionData,
+  useLoaderData,
+  useRouteError,
+} from '@remix-run/react';
+import { ActionFunctionArgs } from '@remix-run/node';
 import { z } from 'zod';
 import invariant from 'tiny-invariant';
-import { QueryClient } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +17,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useUserStore } from '@/store/user';
 import { noteSchema } from '@/model/note';
-import { noteQueries } from '@/queries/note/noteQueriesFactory';
 
 const newNoteSchema = z.object({
   title: z.string().min(1, 'Required'),
@@ -18,36 +24,32 @@ const newNoteSchema = z.object({
   user: z.string(),
 });
 
-export const newNoteAction =
-  (queryClient: QueryClient) =>
-  async ({ request }: ActionFunctionArgs) => {
-    let formData = await request.formData();
+export const clientAction = async ({ request }: ActionFunctionArgs) => {
+  let formData = await request.formData();
 
-    let data = Object.fromEntries(formData);
+  let data = Object.fromEntries(formData);
 
-    let parsed = newNoteSchema.safeParse(data);
+  let parsed = newNoteSchema.safeParse(data);
 
-    if (!parsed.success) {
-      return parsed.error.format();
-    }
+  if (!parsed.success) {
+    return parsed.error.format();
+  }
 
-    let { user, title, message } = parsed.data;
+  let { user, title, message } = parsed.data;
 
-    let response = await fetch(`/note`, {
-      method: 'POST',
-      body: JSON.stringify({ user, title, message }),
-    });
+  let response = await fetch(`/note`, {
+    method: 'POST',
+    body: JSON.stringify({ user, title, message }),
+  });
 
-    await queryClient.invalidateQueries({ queryKey: noteQueries.list(user).queryKey });
+  let note = await response.json();
 
-    let note = await response.json();
+  let noteParsed = noteSchema.parse(note);
 
-    let noteParsed = noteSchema.parse(note);
+  throw redirect(`/note/${noteParsed.id}`);
+};
 
-    throw redirect(`/note/${noteParsed.id}`);
-  };
-
-export const newNoteLoader = async () => {
+export const clientLoader = async () => {
   let user = useUserStore.getState().user;
 
   invariant(user, 'User not found');
@@ -55,10 +57,10 @@ export const newNoteLoader = async () => {
   return user;
 };
 
-export const NewNote = () => {
-  let user = useLoaderData() as Awaited<ReturnType<typeof newNoteLoader>>;
+export default function NewNote() {
+  let user = useLoaderData<typeof clientLoader>();
 
-  let actionData = useActionData() as Awaited<ReturnType<ReturnType<typeof newNoteAction>>>;
+  let actionData = useActionData<typeof clientAction>();
 
   return (
     <Card className='w-full' x-chunk='dashboard-07-chunk-0'>
@@ -93,4 +95,28 @@ export const NewNote = () => {
       </Form>
     </Card>
   );
-};
+}
+
+export function ErrorBoundary() {
+  let error = useRouteError();
+
+  let errorMessage = '';
+
+  if (isRouteErrorResponse(error)) {
+    errorMessage = error.statusText;
+  } else if (error instanceof Error) {
+    errorMessage = error.message;
+  }
+
+  return (
+    <div className='flex flex-col items-center justify-center gap-2 py-8'>
+      <h1>Oops!</h1>
+
+      <p>Sorry, an unexpected error has occurred</p>
+
+      <p>
+        <i>{errorMessage}</i>
+      </p>
+    </div>
+  );
+}

@@ -8,5 +8,6 @@ export const noteSchema = z.object({
 });
 
 export const notesSchema = z.array(noteSchema);
+// export const notesSchema = z.array(noteSchema).promise();
 
 export type NoteType = z.infer<typeof noteSchema>;

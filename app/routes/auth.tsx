@@ -1,11 +1,5 @@
-import {
-  Form,
-  LoaderFunctionArgs,
-  redirect,
-  useActionData,
-  useLocation,
-  useNavigation,
-} from 'react-router-dom';
+import { Form, redirect, useActionData, useLocation, useNavigation } from '@remix-run/react';
+import { LoaderFunctionArgs } from '@remix-run/node';
 import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
@@ -27,7 +21,7 @@ const authSchema = z.object({
   password: z.string().min(1, 'Required'),
 });
 
-export const loginAction = async ({ request }: LoaderFunctionArgs) => {
+export const clientAction = async ({ request }: LoaderFunctionArgs) => {
   let formPayload = await request.formData();
 
   let data = Object.fromEntries(formPayload);
@@ -52,7 +46,7 @@ export const loginAction = async ({ request }: LoaderFunctionArgs) => {
   return null;
 };
 
-export const loginLoader = async () => {
+export const clientLoader = async () => {
   let user = useUserStore.getState().user;
 
   if (user) {
@@ -62,7 +56,7 @@ export const loginLoader = async () => {
   return null;
 };
 
-export const Auth = () => {
+export default function Auth() {
   let location = useLocation();
   let params = new URLSearchParams(location.search);
   let from = params.get('from') || '/';
@@ -70,7 +64,7 @@ export const Auth = () => {
   let navigation = useNavigation();
   let isLoggingIn = navigation.formData?.get('email') != null;
 
-  let actionData = useActionData() as Awaited<ReturnType<typeof loginAction>>;
+  let actionData = useActionData<typeof clientAction>();
 
   return (
     <div className='flex min-h-screen w-full flex-col items-center justify-center'>
@@ -106,4 +100,4 @@ export const Auth = () => {
       </Form>
     </div>
   );
-};
+}
