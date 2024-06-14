@@ -25,7 +25,7 @@ async function enableMocking() {
 enableMocking().then(() => {
   startTransition(() => {
     hydrateRoot(
-      document.querySelector('#app'),
+      document,
       <StrictMode>
         <RemixBrowser />
       </StrictMode>,

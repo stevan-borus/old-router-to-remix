@@ -6,7 +6,7 @@ import {
   useLoaderData,
   useRouteError,
 } from '@remix-run/react';
-import { ActionFunctionArgs } from '@remix-run/node';
+import { ActionFunctionArgs, MetaFunction } from '@remix-run/node';
 import { z } from 'zod';
 import invariant from 'tiny-invariant';
 
@@ -23,6 +23,8 @@ const newNoteSchema = z.object({
   message: z.string().min(1, 'Required'),
   user: z.string(),
 });
+
+export const meta: MetaFunction = () => [{ title: 'New note' }];
 
 export const clientAction = async ({ request }: ActionFunctionArgs) => {
   let formData = await request.formData();

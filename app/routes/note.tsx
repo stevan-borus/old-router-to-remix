@@ -6,7 +6,7 @@ import {
   useNavigation,
   useRouteError,
 } from '@remix-run/react';
-import { ActionFunctionArgs, LoaderFunctionArgs } from '@remix-run/node';
+import { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from '@remix-run/node';
 import invariant from 'tiny-invariant';
 import { Trash } from 'lucide-react';
 
@@ -16,6 +16,10 @@ import NotFound from '@/components/NotFound';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { noteSchema } from '@/model/note';
+
+export const meta: MetaFunction<typeof clientLoader> = ({ data }) => [
+  { title: `Note ${data?.note.title}` },
+];
 
 export const clientAction = async ({ request, params }: ActionFunctionArgs) => {
   let formData = await request.formData();

@@ -8,11 +8,13 @@ import {
   redirect,
   useLoaderData,
 } from '@remix-run/react';
-import { LoaderFunctionArgs } from '@remix-run/node';
+import { LoaderFunctionArgs, MetaFunction } from '@remix-run/node';
 import { useUserStore } from '../store/user';
 import { Button } from '@/components/ui/button';
 import { NoteType, notesSchema } from '@/model/note';
 import { Suspense } from 'react';
+
+export const meta: MetaFunction = ({ error }) => [{ title: error ? 'Oh no!' : 'Notes' }];
 
 export const clientAction = async () => {
   useUserStore.getState().signOut();
