@@ -1,31 +1,20 @@
-import {
-  Await,
-  Form,
-  Link,
-  NavLink,
-  Outlet,
-  defer,
-  redirect,
-  useLoaderData,
-} from '@remix-run/react';
-import { LoaderFunctionArgs, MetaFunction } from '@remix-run/node';
-import { useUserStore } from '../store/user';
+import { Await, Form, Link, NavLink, Outlet, redirect, useLoaderData } from '@remix-run/react';
+import { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction, defer } from '@remix-run/node';
 import { Button } from '@/components/ui/button';
-import { NoteType } from '@/model/note';
+import { NoteType, notesSchema } from '@/model/note';
 import { Suspense } from 'react';
-import { queryClient } from '@/lib/query-client';
-import { noteQueries } from '@/queries/note/noteQueriesFactory';
+import { authenticator } from '@/services/auth';
 
 export const meta: MetaFunction = ({ error }) => [{ title: error ? 'Oh no!' : 'Notes' }];
 
-export const clientAction = async () => {
-  useUserStore.getState().signOut();
-
-  throw redirect('/auth');
+export const action = async ({ request }: ActionFunctionArgs) => {
+  await authenticator.logout(request, { redirectTo: '/auth' });
 };
 
-export const clientLoader = async ({ request }: LoaderFunctionArgs) => {
-  let user = useUserStore.getState().user;
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  let user = await authenticator.isAuthenticated(request, {
+    failureRedirect: '/auth',
+  });
 
   if (!user) {
     let params = new URLSearchParams();
@@ -35,7 +24,9 @@ export const clientLoader = async ({ request }: LoaderFunctionArgs) => {
 
   try {
     return defer({
-      notes: queryClient.ensureQueryData(noteQueries.list(user)),
+      notes: fetch(`http://localhost:3000/notes/${user}`).then(res => {
+        return notesSchema.parse(res.json());
+      }),
     });
   } catch (error) {
     throw new Error(`Error fetching notes - ${error}`);
@@ -43,7 +34,7 @@ export const clientLoader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export default function Root() {
-  let { notes } = useLoaderData<typeof clientLoader>();
+  let { notes } = useLoaderData<typeof loader>();
 
   return (
     <div className='flex min-h-screen w-full flex-col'>

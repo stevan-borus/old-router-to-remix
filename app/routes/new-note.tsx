@@ -3,32 +3,31 @@ import {
   isRouteErrorResponse,
   redirect,
   useActionData,
-  useLoaderData,
   useRouteError,
 } from '@remix-run/react';
 import { ActionFunctionArgs, MetaFunction } from '@remix-run/node';
 import { z } from 'zod';
-import invariant from 'tiny-invariant';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useUserStore } from '@/store/user';
 import { noteSchema } from '@/model/note';
-import { queryClient } from '@/lib/query-client';
-import { noteQueries } from '@/queries/note/noteQueriesFactory';
+import { authenticator } from '@/services/auth';
 
 const newNoteSchema = z.object({
   title: z.string().min(1, 'Required'),
   message: z.string().min(1, 'Required'),
-  user: z.string(),
 });
 
 export const meta: MetaFunction = () => [{ title: 'New note' }];
 
-export const clientAction = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {
+  let user = await authenticator.isAuthenticated(request, {
+    failureRedirect: '/auth',
+  });
+
   let formData = await request.formData();
 
   let data = Object.fromEntries(formData);
@@ -39,9 +38,9 @@ export const clientAction = async ({ request }: ActionFunctionArgs) => {
     return parsed.error.format();
   }
 
-  let { user, title, message } = parsed.data;
+  let { title, message } = parsed.data;
 
-  let response = await fetch(`/note`, {
+  let response = await fetch(`http://localhost:3000/note`, {
     method: 'POST',
     body: JSON.stringify({ user, title, message }),
   });
@@ -50,27 +49,19 @@ export const clientAction = async ({ request }: ActionFunctionArgs) => {
 
   let noteParsed = noteSchema.parse(note);
 
-  await queryClient.invalidateQueries({
-    queryKey: noteQueries.list(user).queryKey,
-    // we need refetchType: 'inactive' or 'all' since we are not using useQuery and friends anywhere
-    refetchType: 'inactive',
-  });
-
   throw redirect(`/note/${noteParsed.id}`);
 };
 
-export const clientLoader = async () => {
-  let user = useUserStore.getState().user;
+export const loader = async ({ request }: ActionFunctionArgs) => {
+  await authenticator.isAuthenticated(request, {
+    failureRedirect: '/auth',
+  });
 
-  invariant(user, 'User not found');
-
-  return user;
+  return null;
 };
 
 export default function NewNote() {
-  let user = useLoaderData<typeof clientLoader>();
-
-  let actionData = useActionData<typeof clientAction>();
+  let actionData = useActionData<typeof action>();
 
   return (
     <Card className='w-full' x-chunk='dashboard-07-chunk-0'>
@@ -79,7 +70,6 @@ export default function NewNote() {
           <CardTitle>Add note</CardTitle>
         </CardHeader>
         <CardContent>
-          <Input type='hidden' name='user' value={user} />
           <div className='grid gap-6'>
             <div className='grid gap-3'>
               <Label htmlFor='title'>Title</Label>

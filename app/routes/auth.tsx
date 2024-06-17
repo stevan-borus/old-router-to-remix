@@ -1,5 +1,5 @@
-import { Form, redirect, useActionData, useLocation, useNavigation } from '@remix-run/react';
-import { LoaderFunctionArgs } from '@remix-run/node';
+import { Form, useActionData, useLocation, useNavigation } from '@remix-run/react';
+import { ActionFunctionArgs, LoaderFunctionArgs } from '@remix-run/node';
 import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
@@ -13,18 +13,16 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { fakeAuthProvider } from '@/backend/auth';
-import { useUserStore } from '@/store/user';
+import { authenticator } from '@/services/auth';
 
 const authSchema = z.object({
   email: z.string().min(1, 'Required').email('Invalid email'),
   password: z.string().min(1, 'Required'),
+  redirectTo: z.string().optional(),
 });
 
-export const clientAction = async ({ request }: LoaderFunctionArgs) => {
-  let formPayload = await request.formData();
-
-  let data = Object.fromEntries(formPayload);
+export const action = async ({ request }: ActionFunctionArgs) => {
+  let data = Object.fromEntries(await request.clone().formData());
 
   let parsed = authSchema.safeParse(data);
 
@@ -32,26 +30,16 @@ export const clientAction = async ({ request }: LoaderFunctionArgs) => {
     return parsed.error.format();
   }
 
-  let { email, password } = parsed.data;
-
-  let isSignedIn = await fakeAuthProvider.signin(email, password);
-
-  if (isSignedIn) {
-    useUserStore.getState().signIn(email!);
-
-    let redirectTo = formPayload.get('redirectTo') as string | null;
-    throw redirect(redirectTo || '/');
-  }
-
-  return null;
+  return await authenticator.authenticate('user-pass', request, {
+    successRedirect: parsed.data.redirectTo || '/',
+    throwOnError: true,
+  });
 };
 
-export const clientLoader = async () => {
-  let user = useUserStore.getState().user;
-
-  if (user) {
-    throw redirect('/');
-  }
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  await authenticator.isAuthenticated(request, {
+    successRedirect: '/',
+  });
 
   return null;
 };
@@ -64,7 +52,7 @@ export default function Auth() {
   let navigation = useNavigation();
   let isLoggingIn = navigation.formData?.get('email') != null;
 
-  let actionData = useActionData<typeof clientAction>();
+  let actionData = useActionData<typeof action>();
 
   return (
     <div className='flex min-h-screen w-full flex-col items-center justify-center'>

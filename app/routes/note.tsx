@@ -6,66 +6,58 @@ import {
   useNavigation,
   useRouteError,
 } from '@remix-run/react';
-import { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from '@remix-run/node';
+import { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction, json } from '@remix-run/node';
 import invariant from 'tiny-invariant';
 import { Trash } from 'lucide-react';
 
-import { useUserStore } from '../store/user';
 import { Button } from '@/components/ui/button';
 import NotFound from '@/components/NotFound';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { queryClient } from '@/lib/query-client';
-import { noteQueries } from '@/queries/note/noteQueriesFactory';
+import { noteSchema } from '@/model/note';
+import { authenticator } from '@/services/auth';
 
-export const meta: MetaFunction<typeof clientLoader> = ({ data }) => [
+export const meta: MetaFunction<typeof loader> = ({ data }) => [
   { title: `Note ${data?.note.title}` },
 ];
 
-export const clientAction = async ({ request, params }: ActionFunctionArgs) => {
-  let formData = await request.formData();
+export const action = async ({ request, params }: ActionFunctionArgs) => {
+  let user = await authenticator.isAuthenticated(request, {
+    failureRedirect: '/auth',
+  });
 
-  let user = formData.get('user') as string | null;
-
-  invariant(user, 'User not found');
   invariant(params.noteId, 'Note id not found');
 
   try {
-    await fetch(`/note/${user}/${params.noteId}`, {
+    await fetch(`http://localhost:3000/note/${user}/${params.noteId}`, {
       method: 'DELETE',
     });
   } catch (err) {
     throw new Error(`Failed to delete note - ${err}`);
   }
 
-  queryClient.removeQueries({ queryKey: noteQueries.note(user, params.noteId).queryKey });
-
-  await queryClient.invalidateQueries({
-    queryKey: noteQueries.list(user).queryKey,
-    // we need refetchType: 'inactive' or 'all' since we are not using useQuery and friends anywhere
-    refetchType: 'inactive',
-  });
-
   throw redirect('/new-note');
 };
 
-export const clientLoader = async ({ params }: LoaderFunctionArgs) => {
-  let user = useUserStore.getState().user;
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+  let user = await authenticator.isAuthenticated(request, {
+    failureRedirect: '/auth',
+  });
 
-  invariant(user, 'User not found');
   invariant(params.noteId, 'Note id not found');
 
   try {
-    let note = await queryClient.ensureQueryData(noteQueries.note(user, params.noteId));
+    let response = await fetch(`http://localhost:3000/note/${user}/${params.noteId}`);
 
-    return { user, note };
+    let note = await response.json();
+
+    return json({ note: noteSchema.parse(note) });
   } catch (error) {
-    throw new Error(`Error fetching notes - ${error}`);
+    throw new Error(`Error fetching note - ${error}`);
   }
 };
 
 export default function Note() {
-  let { user, note } = useLoaderData<typeof clientLoader>();
+  let { note } = useLoaderData<typeof loader>();
 
   let navigation = useNavigation();
 
@@ -87,7 +79,6 @@ export default function Note() {
         </div>
         <div className='ml-auto flex items-center gap-1'>
           <Form method='POST'>
-            <Input type='hidden' name='user' value={user} />
             <Button type='submit' size='icon' variant='outline' className='h-8 w-8'>
               <Trash className='h-3.5 w-3.5' />
               <span className='sr-only'>Delete</span>

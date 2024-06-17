@@ -17,7 +17,7 @@ module.exports = {
   overrides: [
     // React
     {
-      files: ['**/*.{js,jsx,ts,tsx}'],
+      files: ['**/*.{ts,tsx}'],
       plugins: ['react', 'jsx-a11y'],
       extends: [
         'plugin:react/recommended',
@@ -61,6 +61,20 @@ module.exports = {
         'plugin:@typescript-eslint/recommended',
         'plugin:import/recommended',
         'plugin:import/typescript',
+      ],
+    },
+
+    // Remix
+    {
+      files: ['**/*.{ts,tsx}'],
+      extends: ['@remix-run/eslint-config', '@remix-run/eslint-config/node'],
+      overrides: [
+        {
+          rules: {
+            'no-unused-vars': 'warn',
+            '@typescript-eslint/no-unused-vars': 'warn',
+          },
+        },
       ],
     },
 

@@ -5,10 +5,10 @@ const fakeAuthProvider = {
 
     if (email === 'admin@admin.com' && password === 'admin') {
       fakeAuthProvider.isAuthenticated = true;
-      return true;
+      return email;
     }
 
-    return false;
+    throw new Error('Invalid credentials');
   },
   signout() {
     fakeAuthProvider.isAuthenticated = false;
