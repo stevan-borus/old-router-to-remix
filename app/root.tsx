@@ -8,8 +8,11 @@ import {
   useNavigate,
   useRouteError,
 } from '@remix-run/react';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Button } from './components/ui/button';
 import '@/tailwind.css';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './lib/query-client';
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -31,7 +34,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return <Outlet />;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <Outlet />
+
+      <div style={{ fontSize: '16px' }}>
+        <ReactQueryDevtools initialIsOpen={false} buttonPosition='bottom-left' />
+      </div>
+    </QueryClientProvider>
+  );
 }
 
 export function HydrateFallback() {

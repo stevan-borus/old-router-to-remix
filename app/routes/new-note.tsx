@@ -17,6 +17,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useUserStore } from '@/store/user';
 import { noteSchema } from '@/model/note';
+import { queryClient } from '@/lib/query-client';
+import { noteQueries } from '@/queries/note/noteQueriesFactory';
 
 const newNoteSchema = z.object({
   title: z.string().min(1, 'Required'),
@@ -47,6 +49,12 @@ export const clientAction = async ({ request }: ActionFunctionArgs) => {
   let note = await response.json();
 
   let noteParsed = noteSchema.parse(note);
+
+  await queryClient.invalidateQueries({
+    queryKey: noteQueries.list(user).queryKey,
+    // we need refetchType: 'inactive' or 'all' since we are not using useQuery and friends anywhere
+    refetchType: 'inactive',
+  });
 
   throw redirect(`/note/${noteParsed.id}`);
 };

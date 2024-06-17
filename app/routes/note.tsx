@@ -15,7 +15,8 @@ import { Button } from '@/components/ui/button';
 import NotFound from '@/components/NotFound';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { noteSchema } from '@/model/note';
+import { queryClient } from '@/lib/query-client';
+import { noteQueries } from '@/queries/note/noteQueriesFactory';
 
 export const meta: MetaFunction<typeof clientLoader> = ({ data }) => [
   { title: `Note ${data?.note.title}` },
@@ -29,8 +30,20 @@ export const clientAction = async ({ request, params }: ActionFunctionArgs) => {
   invariant(user, 'User not found');
   invariant(params.noteId, 'Note id not found');
 
-  await fetch(`/note/${user}/${params.noteId}`, {
-    method: 'DELETE',
+  try {
+    await fetch(`/note/${user}/${params.noteId}`, {
+      method: 'DELETE',
+    });
+  } catch (err) {
+    throw new Error(`Failed to delete note - ${err}`);
+  }
+
+  queryClient.removeQueries({ queryKey: noteQueries.note(user, params.noteId).queryKey });
+
+  await queryClient.invalidateQueries({
+    queryKey: noteQueries.list(user).queryKey,
+    // we need refetchType: 'inactive' or 'all' since we are not using useQuery and friends anywhere
+    refetchType: 'inactive',
   });
 
   throw redirect('/new-note');
@@ -43,11 +56,9 @@ export const clientLoader = async ({ params }: LoaderFunctionArgs) => {
   invariant(params.noteId, 'Note id not found');
 
   try {
-    let response = await fetch(`/note/${user}/${params.noteId}`);
+    let note = await queryClient.ensureQueryData(noteQueries.note(user, params.noteId));
 
-    let note = await response.json();
-
-    return { user, note: noteSchema.parse(note) };
+    return { user, note };
   } catch (error) {
     throw new Error(`Error fetching notes - ${error}`);
   }

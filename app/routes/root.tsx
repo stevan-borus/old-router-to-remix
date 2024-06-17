@@ -11,8 +11,10 @@ import {
 import { LoaderFunctionArgs, MetaFunction } from '@remix-run/node';
 import { useUserStore } from '../store/user';
 import { Button } from '@/components/ui/button';
-import { NoteType, notesSchema } from '@/model/note';
+import { NoteType } from '@/model/note';
 import { Suspense } from 'react';
+import { queryClient } from '@/lib/query-client';
+import { noteQueries } from '@/queries/note/noteQueriesFactory';
 
 export const meta: MetaFunction = ({ error }) => [{ title: error ? 'Oh no!' : 'Notes' }];
 
@@ -32,24 +34,16 @@ export const clientLoader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   try {
-    let response = await fetch(`/notes/${user}`);
-
-    let notes = await response.json();
-
-    return notesSchema.parse(notes);
-
-    // return defer({
-    //   notes: fetch(`/notes/${user}`).then(res => {
-    //     return notesSchema.parse(res.json());
-    //   }),
-    // });
+    return defer({
+      notes: queryClient.ensureQueryData(noteQueries.list(user)),
+    });
   } catch (error) {
     throw new Error(`Error fetching notes - ${error}`);
   }
 };
 
 export default function Root() {
-  let notes = useLoaderData<typeof clientLoader>();
+  let { notes } = useLoaderData<typeof clientLoader>();
 
   return (
     <div className='flex min-h-screen w-full flex-col'>
