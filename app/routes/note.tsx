@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import NotFound from '@/components/NotFound';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { noteSchema } from '@/model/note';
-import { authenticator } from '@/services/auth';
+import { authenticator } from '@/services/auth.server';
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => [
   { title: `Note ${data?.note.title}` },

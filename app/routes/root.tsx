@@ -3,7 +3,7 @@ import { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction, defer } from '@re
 import { Button } from '@/components/ui/button';
 import { NoteType, notesSchema } from '@/model/note';
 import { Suspense } from 'react';
-import { authenticator } from '@/services/auth';
+import { authenticator } from '@/services/auth.server';
 
 export const meta: MetaFunction = ({ error }) => [{ title: error ? 'Oh no!' : 'Notes' }];
 
